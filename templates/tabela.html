@@ -1,34 +1,76 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ titulo }}</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
     <style>
-        body { background-color: #f8f9fa; padding-bottom: 80px; }
-        .table-hover tbody tr:hover { background-color: #e9ecef; }
+        body { padding-bottom: 80px; }
+        .table-hover tbody tr:hover { background-color: var(--bs-secondary-bg); }
+        
+        /* Drag and Drop */
+        .linha-tabela { cursor: default; }
+        .handle-drag { cursor: grab; color: var(--bs-secondary); touch-action: none; }
+        .handle-drag:active { cursor: grabbing; color: var(--bs-primary); }
+        .sortable-ghost { opacity: 0.4; background-color: #c8ebfb; }
+
         .btn-floating-route {
             position: fixed; bottom: 20px; right: 20px; z-index: 1000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3); border-radius: 50px;
             padding: 12px 24px; font-size: 1.1rem; display: none;
         }
-        .text-complemento { font-size: 0.85rem; color: #6c757d; display: block; margin-top: 2px;}
+        .text-complemento { font-size: 0.85rem; opacity: 0.7; display: block; margin-top: 2px;}
+        .col-acoes { white-space: nowrap; width: 140px; }
+
+        /* --- IMPRESSÃO COMPACTA (Hozintal) --- */
+        @media print {
+            @page { size: horizontal; margin: 0.9cm; }
+            body { zoom: 90%; background-color: white !important; color: black !important; }
+            .no-print, .navbar, .btn, .modal, .form-check-input, .input-group, .alert, #btnTheme { display: none !important; }
+            body, .container, .card, .card-body { width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; }
+            #headerImpressao { display: flex !important; justify-content: space-between; align-items: center; margin-bottom: 5px; border-bottom: 1px solid black; padding-bottom: 5px; }
+            #headerImpressao h3 { margin: 0; font-size: 14pt; } #headerImpressao p { margin: 0; font-size: 9pt; }
+            table { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
+            th, td { border: 1px solid #000 !important; padding: 2px 4px !important; color: black !important; line-height: 1.1 !important; vertical-align: middle; }
+            .text-complemento { color: #000 !important; font-style: italic; font-size: 8pt; opacity: 1; }
+            a { text-decoration: none !important; color: black !important; }
+            tr { break-inside: avoid; }
+        }
+        #headerImpressao { display: none; }
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-dark bg-dark mb-4 shadow sticky-top">
+    <div id="headerImpressao" class="container mt-4">
+        <h3 class="fw-bold text-uppercase">{{ titulo }}</h3>
+        <p>Gerado em: <span id="dataImpressao"></span></p>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow sticky-top no-print">
         <div class="container">
-            <a class="btn btn-outline-light" href="{{ url_for('index') }}">
-                <i class="bi bi-arrow-left"></i> Voltar
-            </a>
-            <span class="navbar-text text-white fw-bold d-none d-md-block">{{ titulo }}</span>
-            <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalAdicionar">
-                <i class="bi bi-plus-lg"></i> Adicionar
-            </button>
+            <a class="btn btn-outline-light me-2" href="{{ url_for('index') }}"><i class="bi bi-arrow-left"></i> Voltar</a>
+            <span class="navbar-text text-white fw-bold me-auto">{{ titulo }}</span>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-success fw-bold" onclick="copiarParaWhatsapp()" title="Copiar lista para o WhatsApp">
+                    <i class="bi bi-whatsapp"></i> <span class="d-none d-md-inline">Copiar Lista</span>
+                </button>
+
+                <button class="btn btn-outline-light" id="btnTheme" onclick="alternarTema()">
+                    <i class="bi bi-moon-stars-fill"></i>
+                </button>
+
+                <button class="btn btn-light fw-bold" onclick="prepararImpressao()">
+                    <i class="bi bi-printer-fill"></i> <span class="d-none d-md-inline">Imprimir</span>
+                </button>
+                <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalAdicionar">
+                    <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline">Adicionar</span>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -36,71 +78,86 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm">
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm no-print">
                         {{ message }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        {% if registros %}
-        <div class="d-flex justify-content-end mb-2">
-            <button class="btn btn-sm btn-outline-secondary" onclick="alternarSelecao()">
-                <i class="bi bi-check-all"></i> Marcar/Desmarcar Todos
-            </button>
+        <div class="row mb-3 no-print">
+            <div class="col-md-6 d-flex align-items-center">
+                 <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="filtroLocal" class="form-control" placeholder="Filtrar nesta lista...">
+                 </div>
+            </div>
+            <div class="col-md-6 d-flex justify-content-end align-items-center mt-2 mt-md-0">
+                {% if registros %}
+                <button class="btn btn-sm btn-outline-secondary" onclick="alternarSelecao()">
+                    <i class="bi bi-check-all"></i> Selecionar Todos
+                </button>
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
 
         <div class="card shadow border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover mb-0 align-middle">
+                    <table class="table table-striped table-hover mb-0 align-middle" id="tabelaDados">
                         <thead class="table-dark text-center">
                             <tr>
-                                <th style="width: 40px;"><i class="bi bi-check2-square"></i></th>
-                                <th style="width: 50px;">#</th>
+                                <th style="width: 30px;" class="no-print"><i class="bi bi-check2-square"></i></th>
+                                <th style="width: 40px;" class="no-print" title="Segure aqui para mover"><i class="bi bi-arrows-move"></i></th>
+                                <th class="text-center" style="width: 40px;">#</th>
                                 <th class="text-start">Empresa</th>
-                                <th class="text-start">Endereço de Coleta</th>
-                                <th style="width: 110px;">Ações</th>
+                                <th class="text-start">Endereço</th>
+                                <th class="text-center no-print" style="width: 50px;">Tel</th> 
+                                <th class="col-acoes no-print">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="listaEnderecos">
                             {% for item in registros %}
-                            <tr>
-                                <td class="text-center">
+                            <tr class="linha-tabela" id="linha-{{ item.id }}" data-id="{{ item.id }}">
+                                <td class="text-center no-print">
                                     <input class="form-check-input checkbox-rota" type="checkbox" 
-                                           value="{{ item.Endereço }}" 
+                                           value="{{ item.Endereço }}" data-row-id="linha-{{ item.id }}"
                                            onchange="atualizarBotaoRota()">
                                 </td>
-                                <td class="text-center fw-bold text-muted">{{ loop.index }}</td>
-                                <td class="fw-semibold">{{ item.Empresa }}</td>
+                                <td class="text-center fs-4 handle-drag no-print"><i class="bi bi-grip-vertical"></i></td>
+                                <td class="text-center fw-bold">{{ loop.index }}</td>
+                                <td class="fw-semibold nome-empresa">{{ item.Empresa }}</td>
                                 <td>
-                                    <a href="https://www.google.com/maps/search/?api=1&query={{ item.Endereço }}" target="_blank" class="text-decoration-none fw-bold text-primary">
-                                        <i class="bi bi-geo-alt-fill text-danger"></i> {{ item.Endereço }}
+                                    <a href="https://www.google.com/maps/search/?api=1&query={{ item.Endereço }}" target="_blank" class="text-decoration-none fw-bold text-primary link-endereco">
+                                        <i class="bi bi-geo-alt-fill text-danger no-print"></i> {{ item.Endereço }}
                                     </a>
                                     {% if item.Complemento %}
-                                        <span class="text-complemento">
-                                            <i class="bi bi-info-circle-fill" style="font-size: 0.7rem;"></i> {{ item.Complemento }}
-                                        </span>
+                                        <div class="text-complemento">Obs: {{ item.Complemento }}</div>
                                     {% endif %}
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center no-print">
+                                    {% if item.Telefone %}
+                                        {% set tel_limpo = item.Telefone|replace(" ", "")|replace("-", "")|replace("(", "")|replace(")", "") %}
+                                        <a href="https://wa.me/55{{ tel_limpo }}?text=Olá,%20boa%20tarde!" target="_blank" class="btn btn-sm btn-success rounded-circle">
+                                            <i class="bi bi-whatsapp"></i>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted opacity-25">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center col-acoes no-print">
                                     <button class="btn btn-sm btn-outline-primary" 
-                                            onclick="preencherModalEditar('{{ item.id }}', '{{ item.Empresa }}', '{{ item.Endereço }}', '{{ item.Complemento }}')"
-                                            data-bs-toggle="modal" data-bs-target="#modalEditar">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
+                                            onclick="preencherModalEditar('{{ item.id }}', '{{ item.Empresa }}', '{{ item.Endereço }}', '{{ item.Complemento }}', '{{ item.Telefone }}')"
+                                            data-bs-toggle="modal" data-bs-target="#modalEditar"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-warning" 
+                                            onclick="preencherModalMover('{{ item.id }}', '{{ item.Empresa }}')"
+                                            data-bs-toggle="modal" data-bs-target="#modalMover"><i class="bi bi-truck"></i></button>
                                     <a href="{{ url_for('excluir', nome_rota=nome_rota, id_linha=item.id) }}" 
-                                       class="btn btn-sm btn-outline-danger"
-                                       onclick="return confirm('Excluir esta empresa?')">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
+                                       class="btn btn-sm btn-outline-danger" onclick="return confirm('Excluir?')"><i class="bi bi-trash"></i></a>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">Nenhuma empresa cadastrada.</td>
-                            </tr>
+                            <tr><td colspan="7" class="text-center py-5 text-muted">Vazio.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -109,137 +166,211 @@
         </div>
     </div>
 
-    <button id="btnRota" class="btn btn-success btn-floating-route" onclick="abrirRotaNoMaps()">
+    <button id="btnRota" class="btn btn-success btn-floating-route no-print" onclick="abrirRotaNoMaps()">
         <i class="bi bi-map-fill"></i> Iniciar Rota (<span id="contadorRota">0</span>)
     </button>
 
-    <div class="modal fade" id="modalAdicionar" tabindex="-1">
+    <div class="modal fade no-print" id="modalAdicionar" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="{{ url_for('adicionar', nome_rota=nome_rota) }}" method="POST">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">Nova Coleta</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
+                    <div class="modal-header bg-primary text-white"><h5 class="modal-title">Nova Coleta</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="fw-bold">Empresa</label>
-                            <input type="text" class="form-control" name="empresa" required>
-                        </div>
-                        
+                        <div class="mb-3"><label class="fw-bold">Empresa</label><input type="text" class="form-control" name="empresa" required></div>
+                        <div class="mb-3"><label class="fw-bold text-success">WhatsApp (DDD + Número)</label><input type="number" class="form-control" name="telefone" placeholder="Ex: 21999998888"></div>
                         <div class="row g-2">
-                            <div class="col-12">
-                                <label class="fw-bold text-danger">Endereço (GPS)</label>
-                                <input type="text" class="form-control" name="endereco" required placeholder="Ex: Av. Brasil, 500">
-                                <div class="form-text">Somente rua e número. O Maps usará este campo.</div>
-                            </div>
-                            <div class="col-12 mt-2">
-                                <label class="fw-bold text-secondary">Complemento (Obs)</label>
-                                <input type="text" class="form-control" name="complemento" placeholder="Ex: Bloco B, Apto 102, Falar com João">
-                                <div class="form-text">Informações extras para o motorista.</div>
-                            </div>
+                            <div class="col-12"><label class="fw-bold text-danger">Endereço</label><input type="text" class="form-control" name="endereco" required></div>
+                            <div class="col-12 mt-2"><label class="fw-bold text-secondary">Complemento</label><input type="text" class="form-control" name="complemento"></div>
                         </div>
-
                         <hr>
-                        <div class="mb-3">
-                            <label class="fw-bold text-primary">Posição na rota</label>
+                        <div class="mb-3"><label class="fw-bold text-primary">Posição</label>
                             <select class="form-select" name="posicao">
                                 <option value="fim" selected>🔻 No Final</option>
                                 <option value="inicio">🔺 No Início</option>
-                                {% if registros %}
-                                <optgroup label="Depois de:">
-                                    {% for item in registros %}
-                                        <option value="{{ item.id }}">{{ loop.index }} - {{ item.Empresa }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
+                                {% if registros %}<optgroup label="Depois de:">{% for item in registros %}<option value="{{ item.id }}">{{ item.Empresa }}</option>{% endfor %}</optgroup>{% endif %}
                             </select>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success">Salvar</button>
-                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-success">Salvar</button></div>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalEditar" tabindex="-1">
+    <div class="modal fade no-print" id="modalEditar" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="{{ url_for('editar', nome_rota=nome_rota) }}" method="POST">
                     <input type="hidden" name="id_linha" id="editId">
-                    <div class="modal-header bg-warning">
-                        <h5 class="modal-title">Editar</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
+                    <div class="modal-header bg-warning"><h5 class="modal-title">Editar</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="fw-bold">Empresa</label>
-                            <input type="text" class="form-control" name="empresa" id="editEmpresa" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold text-danger">Endereço (GPS)</label>
-                            <input type="text" class="form-control" name="endereco" id="editEndereco" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold text-secondary">Complemento</label>
-                            <input type="text" class="form-control" name="complemento" id="editComplemento">
-                        </div>
+                        <div class="mb-3"><label class="fw-bold">Empresa</label><input type="text" class="form-control" name="empresa" id="editEmpresa" required></div>
+                        <div class="mb-3"><label class="fw-bold text-success">WhatsApp</label><input type="number" class="form-control" name="telefone" id="editTelefone"></div>
+                        <div class="mb-3"><label class="fw-bold text-danger">Endereço</label><input type="text" class="form-control" name="endereco" id="editEndereco" required></div>
+                        <div class="mb-3"><label class="fw-bold text-secondary">Complemento</label><input type="text" class="form-control" name="complemento" id="editComplemento"></div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary">Salvar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade no-print" id="modalMover" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="{{ url_for('mover_coleta') }}" method="POST">
+                    <input type="hidden" name="rota_origem" value="{{ nome_rota }}">
+                    <input type="hidden" name="id_linha" id="moverId">
+                    <div class="modal-header bg-warning"><h5 class="modal-title">Mover Coleta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <p>Transferir <strong><span id="moverEmpresa"></span></strong> para:</p>
+                        <select class="form-select" name="rota_destino" required>
+                            {% for chave, dados in opcoes.items() %}
+                                <option value="{{ chave }}" {% if chave == nome_rota %}disabled{% endif %}>{{ dados.titulo }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-primary">Mover</button></div>
                 </form>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script>
-        // Agora recebe também o complemento para preencher o formulário
-        function preencherModalEditar(id, empresa, endereco, complemento) {
+        // --- 1. COPIAR PARA WHATSAPP (CORRIGIDO) ---
+        function copiarParaWhatsapp() {
+            let titulo = "{{ titulo }}";
+            let texto = `*📋 ${titulo}*\n\n`;
+
+            const linhas = document.querySelectorAll('#listaEnderecos .linha-tabela');
+            
+            // Verifica se tem itens selecionados
+            const checkboxesSelecionados = document.querySelectorAll('.checkbox-rota:checked');
+            const modoSelecao = checkboxesSelecionados.length > 0;
+
+            let count = 1;
+
+            linhas.forEach(linha => {
+                // 1. Deve estar visível (filtro de busca)
+                if(linha.style.display !== 'none') {
+                    
+                    // 2. Se estiver no modo seleção, a checkbox precisa estar marcada
+                    const checkbox = linha.querySelector('.checkbox-rota');
+                    if(modoSelecao && !checkbox.checked) {
+                        return; // Pula este item
+                    }
+
+                    let empresa = linha.querySelector('.nome-empresa').innerText.trim();
+                    let endereco = linha.querySelector('a.link-endereco').innerText.trim();
+                    let complElement = linha.querySelector('.text-complemento');
+                    let complemento = complElement ? complElement.innerText.replace('Obs:', '').trim() : "";
+
+                    texto += `*${count}. ${empresa}*\n`;
+                    texto += `   📍 ${endereco}\n`;
+                    if(complemento) texto += `   ℹ️ _${complemento}_\n`;
+                    texto += `\n`;
+                    count++;
+                }
+            });
+
+            texto += `_Gerado pelo Sistema de Coletas_`;
+
+            navigator.clipboard.writeText(texto).then(() => {
+                alert(modoSelecao 
+                    ? `✅ Lista copiada! (${checkboxesSelecionados.length} selecionados)` 
+                    : '✅ Lista completa copiada!');
+            }).catch(err => {
+                alert('Erro ao copiar.');
+                console.error(err);
+            });
+        }
+
+        // --- SCRIPTS EXISTENTES ---
+        function carregarTema() {
+            const temaSalvo = localStorage.getItem('tema') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', temaSalvo);
+            atualizarIconeTema(temaSalvo);
+        }
+        function alternarTema() {
+            const atual = document.documentElement.getAttribute('data-bs-theme');
+            const novo = atual === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-bs-theme', novo);
+            localStorage.setItem('tema', novo);
+            atualizarIconeTema(novo);
+        }
+        function atualizarIconeTema(tema) {
+            const btn = document.getElementById('btnTheme');
+            if(tema === 'dark') { btn.innerHTML = '<i class="bi bi-sun-fill"></i>'; btn.className = 'btn btn-outline-light'; }
+            else { btn.innerHTML = '<i class="bi bi-moon-stars-fill"></i>'; btn.className = 'btn btn-outline-light'; }
+        }
+        carregarTema();
+
+        var el = document.getElementById('listaEnderecos');
+        var sortable = Sortable.create(el, {
+            animation: 150, ghostClass: 'sortable-ghost', handle: '.handle-drag',
+            onEnd: function (evt) {
+                let novaOrdem = [];
+                document.querySelectorAll('#listaEnderecos tr').forEach(row => novaOrdem.push(row.getAttribute('data-id')));
+                fetch("{{ url_for('reordenar_drag', nome_rota=nome_rota) }}", {
+                    method: "POST", headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ordem: novaOrdem })
+                }).then(res => { if(res.ok) window.location.reload(); });
+            }
+        });
+
+        function preencherModalEditar(id, empresa, endereco, complemento, telefone) {
             document.getElementById('editId').value = id;
             document.getElementById('editEmpresa').value = empresa;
             document.getElementById('editEndereco').value = endereco;
             document.getElementById('editComplemento').value = complemento;
+            document.getElementById('editTelefone').value = telefone;
+        }
+        function preencherModalMover(id, empresa) {
+            document.getElementById('moverId').value = id;
+            document.getElementById('moverEmpresa').innerText = empresa;
         }
 
+        function prepararImpressao() {
+            const hoje = new Date();
+            document.getElementById('dataImpressao').innerText = hoje.toLocaleDateString('pt-BR') + ' ' + hoje.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+            const checkboxes = document.querySelectorAll('.checkbox-rota:checked');
+            if (checkboxes.length > 0) {
+                document.querySelectorAll('.linha-tabela').forEach(linha => {
+                    if (!linha.querySelector('.checkbox-rota').checked) linha.classList.add('d-none', 'oculto-impressao');
+                });
+            }
+            window.print();
+            setTimeout(() => { document.querySelectorAll('.oculto-impressao').forEach(l => l.classList.remove('d-none', 'oculto-impressao')); }, 500);
+        }
+
+        document.getElementById('filtroLocal').addEventListener('keyup', function() {
+            let termo = this.value.toLowerCase();
+            document.querySelectorAll('#listaEnderecos .linha-tabela').forEach(linha => {
+                let nome = linha.querySelector('.nome-empresa').textContent.toLowerCase();
+                linha.style.display = nome.includes(termo) ? '' : 'none';
+            });
+        });
         function atualizarBotaoRota() {
             const checkboxes = document.querySelectorAll('.checkbox-rota:checked');
             const btn = document.getElementById('btnRota');
             document.getElementById('contadorRota').innerText = checkboxes.length;
             btn.style.display = checkboxes.length > 0 ? 'block' : 'none';
         }
-
         function alternarSelecao() {
             const checkboxes = document.querySelectorAll('.checkbox-rota');
-            const algumaDesmarcada = Array.from(checkboxes).some(c => !c.checked);
-            checkboxes.forEach(c => c.checked = algumaDesmarcada);
+            const visiveis = Array.from(checkboxes).filter(c => c.closest('tr').style.display !== 'none');
+            const algumaDesmarcada = visiveis.some(c => !c.checked);
+            visiveis.forEach(c => c.checked = algumaDesmarcada);
             atualizarBotaoRota();
         }
-
         function abrirRotaNoMaps() {
             const checkboxes = document.querySelectorAll('.checkbox-rota:checked');
             if (checkboxes.length === 0) return;
-
-            // Pega APENAS o value (que é o endereço puro)
             let enderecos = Array.from(checkboxes).map(c => c.value);
-            
-            // O Maps vai abrir ignorando os complementos visuais
             const baseURL = "https://www.google.com/maps/dir/";
             const origin = "My Location"; 
-            
-            // Monta a URL no formato novo do Maps que aceita melhor waypoints
-            // Formato: dir/Origem/Parada1/Parada2/Destino
-            
             let rota = enderecos.map(e => encodeURIComponent(e)).join("/");
-            const finalURL = `${baseURL}${origin}/${rota}`;
-            
-            window.open(finalURL, '_blank');
+            window.open(`${baseURL}${origin}/${rota}`, '_blank');
         }
     </script>
 </body>

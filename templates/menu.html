@@ -4,44 +4,156 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestor de Coletas</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon"><link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .hero-section { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 40px 0; border-radius: 0 0 20px 20px; margin-bottom: 40px; }
-        .card-menu { border: none; transition: all 0.3s ease; border-radius: 15px; }
-        .card-menu:hover { transform: translateY(-8px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        .icon-box { font-size: 2.5rem; color: #0d6efd; margin-bottom: 15px; }
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+        .hero-section { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 40px 0 60px; border-radius: 0 0 30px 30px; margin-bottom: -30px; }
+        .card-menu { border: none; transition: transform 0.2s; border-radius: 15px; }
+        .card-menu:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .search-container { max-width: 600px; margin: 0 auto; position: relative; z-index: 10; }
+        .card-result { border-left: 5px solid #198754; }
     </style>
 </head>
 <body>
     
     <div class="hero-section text-center shadow">
         <div class="container">
-            <h1 class="display-4 fw-bold"><i class="bi bi-truck" style="color: yellow"></i> La Playa de Coletas</h1>
-            <p class="lead">Selecione uma rota para gerenciar empresas e endereços</p>
+            <h1 class="display-5 fw-bold mb-3"><i class="bi bi-truck"></i> Central de Coletas LaPlaya</h1>
+            
+            <form action="{{ url_for('index') }}" method="GET" class="search-container shadow-sm">
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar..." value="{{ termo_busca }}">
+                    <button class="btn btn-light border-0 text-primary fw-bold pe-4" type="submit">Buscar</button>
+                    {% if termo_busca %}
+                    <a href="{{ url_for('index') }}" class="btn btn-light border-0 text-danger"><i class="bi bi-x-lg"></i></a>
+                    {% endif %}
+                </div>
+                
+                <div class="bg-blue rounded-bottom px-4 py-2 d-flex justify-content-center gap-4 text-dark larger-font mt-2">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="chk_empresa" id="chkEmpresa" 
+                               {% if chk_empresa %}checked{% endif %}>
+                        <label class="form-check-label" for="chkEmpresa">Nome da Empresa</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="chk_endereco" id="chkEndereco"
+                               {% if chk_endereco %}checked{% endif %}>
+                        <label class="form-check-label" for="chkEndereco">Endereço</label>
+                    </div>
+                </div>
+
+            </form>
         </div>
     </div>
 
-    <div class="container pb-5">
+    <div class="container pt-5 pb-5">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if termo_busca %}
+        <div class="mb-5">
+            <h4 class="text-secondary mb-3">Resultados para: <strong>"{{ termo_busca }}"</strong></h4>
+            <div class="row g-3">
+                {% for res in resultados %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm card-result h-100">
+                        <div class="card-body">
+                            <h6 class="text-success text-uppercase fw-bold small"><i class="bi bi-folder"></i> {{ res.rota_titulo }}</h6>
+                            <h5 class="card-title fw-bold">{{ res.Empresa }}</h5>
+                            <p class="card-text text-muted mb-1"><i class="bi bi-geo-alt"></i> {{ res.Endereço }}</p>
+                            {% if res.Complemento %}
+                            <small class="text-secondary d-block mb-3"><i class="bi bi-info-circle"></i> {{ res.Complemento }}</small>
+                            {% endif %}
+                            <a href="{{ url_for('ver_coleta', nome_rota=res.rota_id) }}" class="btn btn-sm btn-outline-success w-100 stretched-link">Abrir Rota</a>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12 text-center py-4">
+                    <p class="text-muted fs-5">Nenhum resultado encontrado.</p>
+                </div>
+                {% endfor %}
+            </div>
+            <hr class="my-5">
+        </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold m-0 text-secondary">Rotas: </h4>
+            <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovaRota">
+                <i class="bi bi-plus-lg"></i> Criar Nova Rota
+            </button>
+        </div>
+
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for chave, dados in opcoes.items() %}
             <div class="col">
-                <a href="{{ url_for('ver_coleta', nome_rota=chave) }}" class="text-decoration-none text-dark">
-                    <div class="card h-100 shadow-sm card-menu p-4">
-                        <div class="card-body text-center">
-                            <div class="icon-box"><i class="bi bi-geo-alt"></i></div>
-                            <h4 class="card-title fw-bold">{{ dados.titulo }}</h4>
-                            <p class="text-muted">Clique para abrir a planilha</p>
+                <div class="card h-100 shadow-sm card-menu">
+                    <div class="card-body text-center p-4">
+                        <div class="d-flex justify-content-end gap-2 mb-2" style="position: relative; z-index: 5;">
+                             <button class="btn btn-sm text-primary opacity-50 hover-opacity-100 p-0 border-0 bg-transparent"
+                                     onclick="preencherRenomear('{{ chave }}', '{{ dados.titulo }}')"
+                                     data-bs-toggle="modal" data-bs-target="#modalRenomear">
+                                <i class="bi bi-pencil-square fs-5"></i>
+                             </button>
+                             <a href="{{ url_for('remover_rota', rota_id=chave) }}" 
+                                class="text-danger opacity-25 hover-opacity-100" 
+                                onclick="return confirm('Remover esta rota?')" title="Remover">
+                                <i class="bi bi-trash-fill fs-5"></i>
+                             </a>
                         </div>
+                        <a href="{{ url_for('ver_coleta', nome_rota=chave) }}" class="text-decoration-none text-dark">
+                            <div class="mb-3 text-primary display-4"><i class="bi bi-folder2-open"></i></div>
+                            <h5 class="card-title fw-bold">{{ dados.titulo }}</h5>
+                            <p class="text-muted small">Gerenciar rota</p>
+                        </a>
                     </div>
-                </a>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
 
+    <div class="modal fade" id="modalNovaRota" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="{{ url_for('nova_rota') }}" method="POST">
+                    <div class="modal-header"><h5 class="modal-title">Criar Rota</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body"><input type="text" class="form-control" name="titulo_rota" placeholder="Nome da Rota" required></div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary">Criar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modalRenomear" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="{{ url_for('renomear_rota') }}" method="POST">
+                    <input type="hidden" name="rota_id" id="renomearId">
+                    <div class="modal-header"><h5 class="modal-title">Renomear</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body"><input type="text" class="form-control" name="novo_titulo" id="renomearTitulo" required></div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-info text-white">Salvar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function preencherRenomear(id, tituloAtual) {
+            document.getElementById('renomearId').value = id;
+            document.getElementById('renomearTitulo').value = tituloAtual;
+        }
+    </script>
 </body>
 </html>

@@ -1,0 +1,34 @@
+{
+    "campo_grande": {
+        "titulo": "Coleta Campo Grande",
+        "arquivo": "coleta_campo_grande.xlsx"
+    },
+    "everton": {
+        "titulo": "Coleta Everton",
+        "arquivo": "coleta_everton.xlsx"
+    },
+    "moises": {
+        "titulo": "Coleta Moises (Recreio)",
+        "arquivo": "coleta_moises.xlsx"
+    },
+    "paulo": {
+        "titulo": "Coleta Paulo",
+        "arquivo": "coleta_paulo.xlsx"
+    },
+    "BarraManha": {
+        "titulo": "Coleta BarraShopping",
+        "arquivo": "coleta_barra_manha.xlsx"
+    },
+    "RioDesignManha": {
+        "titulo": "Coleta RioDesign",
+        "arquivo": "coleta_RioDesign_manha.xlsx"
+    },
+    "Yago+Jairo": {
+        "titulo": "Coleta Yago",
+        "arquivo": "coleta_jairoYago.xlsx"
+    },
+    "moises_barra": {
+        "titulo": "Coleta Moises (Barra)",
+        "arquivo": "coleta_coleta_moises_barra.xlsx"
+    }
+}
