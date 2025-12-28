@@ -117,7 +117,7 @@ As rotas são configuradas no arquivo `rotas.json`. Exemplo de configuração:
 
 ## 📝 Licença
 
-Este projeto está sob licença livre para uso. 
+Este projeto está sob licença restrita para uso. 
 
 ## 👤 Autor
 
